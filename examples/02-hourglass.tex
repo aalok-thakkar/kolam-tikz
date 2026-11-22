@@ -1,0 +1,25 @@
+% An eight-pulli hourglass woven only from coordinate declarations and gates.
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+\begin{tikzpicture}[kolam grid]
+  \path[use as bounding box] (-.60,-.60) rectangle (2.60,3.60);
+  \begin{kolam}
+    \KolamSetup{turn radius=exact,line width=1.15pt,dot size=4.1pt}
+    % The 1--3--3--1 pulli field.
+    \KolamPulli{1}{3}
+    \KolamPulli{0}{2}\KolamPulli{1}{2}\KolamPulli{2}{2}
+    \KolamPulli{0}{1}\KolamPulli{1}{1}\KolamPulli{2}{1}
+    \KolamPulli{1}{0}
+
+    % Every induced edge is open.  This produces a single ornamental stroke.
+    \KolamOpenGate{1}{3}{1}{2}
+    \KolamOpenGate{0}{2}{1}{2}\KolamOpenGate{1}{2}{2}{2}
+    \KolamOpenGate{0}{1}{1}{1}\KolamOpenGate{1}{1}{2}{1}
+    \KolamOpenGate{0}{2}{0}{1}\KolamOpenGate{1}{2}{1}{1}
+    \KolamOpenGate{2}{2}{2}{1}\KolamOpenGate{1}{1}{1}{0}
+    \KolamRender
+  \end{kolam}
+\end{tikzpicture}
+\end{document}

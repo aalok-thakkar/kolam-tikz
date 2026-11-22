@@ -1,0 +1,30 @@
+% A ten-pulli one-stroke Drop-Fan kolam.
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+% Keep the construction on its unit grid, then scale the completed drawing.
+% Changing x/y alone would desynchronise TikZ's physical arc radii from the
+% coordinate grid and spoil the exact tangent joins.
+\begin{tikzpicture}[kolam grid,scale=.98]
+  \path[use as bounding box] (-.55,-.55) rectangle (4.55,1.55);
+  \begin{kolam}
+    \KolamSetup{turn radius=exact,line width=1.15pt,dot size=4.1pt}
+    \KolamPulli{0}{0}\KolamPulli{1}{0}\KolamPulli{2}{0}
+    \KolamPulli{3}{0}\KolamPulli{4}{0}
+    \KolamPulli{0}{1}\KolamPulli{1}{1}\KolamPulli{2}{1}
+    \KolamPulli{3}{1}\KolamPulli{4}{1}
+
+    % The two unlisted end rungs are closed; all listed gates are open.
+    \KolamOpenGate{0}{0}{1}{0}\KolamOpenGate{1}{0}{2}{0}
+    \KolamOpenGate{2}{0}{3}{0}\KolamOpenGate{3}{0}{4}{0}
+    \KolamOpenGate{0}{1}{1}{1}\KolamOpenGate{1}{1}{2}{1}
+    \KolamOpenGate{2}{1}{3}{1}\KolamOpenGate{3}{1}{4}{1}
+    \KolamOpenGate{1}{0}{1}{1}
+    \KolamOpenGate{2}{0}{2}{1}
+    \KolamOpenGate{3}{0}{3}{1}
+    \KolamAssertDropFan
+    \KolamRender
+  \end{kolam}
+\end{tikzpicture}
+\end{document}

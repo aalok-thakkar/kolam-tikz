@@ -1,0 +1,371 @@
+%% kolam-tikz.sty --- a coordinate-first TikZ grammar for pulli kolam
+%% SPDX-License-Identifier: MIT
+%% Copyright (c) 2026 the kolam-tikz contributors
+%%
+%% A kolam program declares integer-grid pulli and labels cardinally adjacent
+%% pairs as open or closed gates.  The package expands that finite grammar
+%% into circular local turns and tangent tracks.  See docs/grammar.md.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{kolam-tikz}[2026/11/22 v0.1.0 coordinate pulli grammar]
+
+\RequirePackage{tikz}
+\usetikzlibrary{calc}
+
+% --------------------------------------------------------------------------
+% Appearance and geometry
+% --------------------------------------------------------------------------
+\definecolor{kolamTikZInk}{HTML}{000000}
+\definecolor{kolamTikZPaper}{HTML}{FFFFFF}
+
+% The exact radius is 1/(2 sqrt(2)) for unit, isotropic grid spacing.  It
+% places the tangent ports at 45 degrees, making successive tangent tracks
+% collinear.  Any radius strictly between 0 and 1/2 is also supported.
+\newcommand{\KolamExactRadius}{.353553390593}
+\newcommand{\kolamRadius}{\KolamExactRadius}
+\newcommand{\kolamLineWidth}{1.15pt}
+\newcommand{\kolamDotSize}{4.10pt}
+\newcommand{\kolamDotFill}{black}
+\newcommand{\kolamBackground}{kolamTikZPaper}
+\newif\ifkolamExactTurn
+\kolamExactTurntrue
+
+\pgfkeys{/kolam/.is family,
+  /kolam/radius/.code={\def\kolamRadius{#1}\kolamExactTurnfalse},
+  /kolam/turn radius/.is choice,
+  /kolam/turn radius/exact/.code={\def\kolamRadius{\KolamExactRadius}\kolamExactTurntrue},
+  /kolam/turn radius/.default=exact,
+  /kolam/line width/.store in=\kolamLineWidth,
+  /kolam/dot size/.store in=\kolamDotSize,
+  /kolam/dot fill/.store in=\kolamDotFill,
+  /kolam/background/.store in=\kolamBackground}
+
+\newcommand{\kolamRadiusError}[1]{%
+  \PackageError{kolam-tikz}{Turn radius '#1' is outside the permitted range}%
+    {Use a number strictly between 0 and .5; reverting to turn radius=exact.}%
+  \def\kolamRadius{\KolamExactRadius}\kolamExactTurntrue}
+\newcommand{\kolamValidateRadius}{%
+  \edef\kolamRadiusInput{\kolamRadius}%
+  \pgfmathparse{\kolamRadiusInput}%
+  \edef\kolamRadius{\pgfmathresult}%
+  \ifdim\kolamRadius pt>0pt\relax
+    \ifdim\kolamRadius pt<.5pt\relax\else
+      \kolamRadiusError{\kolamRadiusInput}%
+    \fi
+  \else
+    \kolamRadiusError{\kolamRadiusInput}%
+  \fi}
+\newcommand{\KolamSetup}[1]{\pgfqkeys{/kolam}{#1}\KolamRecompute}
+\newcommand{\KolamRecompute}{%
+  \kolamValidateRadius
+  \ifkolamExactTurn
+    \def\kolamAlpha{45}%
+  \else
+    \pgfmathsetmacro{\kolamAlpha}{asin(2*\kolamRadius)}%
+  \fi
+  \pgfmathsetmacro{\kolamNne}{\kolamAlpha}%
+  \pgfmathsetmacro{\kolamEne}{90-\kolamAlpha}%
+  \pgfmathsetmacro{\kolamEse}{-\kolamEne}%
+  \pgfmathsetmacro{\kolamSse}{-\kolamNne}%
+  \pgfmathsetmacro{\kolamSsw}{-180+\kolamAlpha}%
+  \pgfmathsetmacro{\kolamWsw}{-90-\kolamAlpha}%
+  \pgfmathsetmacro{\kolamWswCCW}{270-\kolamAlpha}%
+  \pgfmathsetmacro{\kolamWnw}{90+\kolamAlpha}%
+  \pgfmathsetmacro{\kolamNnw}{180-\kolamAlpha}}
+\KolamRecompute
+
+\tikzset{
+  kolam grid/.style={x=1cm,y=1cm},
+  kolam strand/.style={draw=kolamTikZInk,line width=\kolamLineWidth,
+    line cap=butt,line join=round},
+  kolam dot/.style={circle,fill=\kolamDotFill,draw=\kolamBackground,
+    line width=.45pt,minimum size=\kolamDotSize,inner sep=0pt}}
+
+% --------------------------------------------------------------------------
+% Coordinate grammar
+% --------------------------------------------------------------------------
+% A \KolamPulli{x}{y} declaration is a terminal in the grammar.  The active
+% dot set is finite and all permitted gates are the induced cardinal unit
+% edges.  \begin{kolam}...\end{kolam} scopes a declaration set, allowing
+% multiple independent motifs in one TikZ picture.
+\newcount\kolamEnvironmentSerial
+\newcount\kolamDotCount
+\newcount\kolamGateCount
+\newcount\kolamOpenDegree
+\newif\ifkolamActive
+\newif\ifkolamDeclarationValid
+\newif\ifkolamGateEndpointsValid
+\newif\ifkolamGateStateValid
+\kolamActivefalse
+\def\kolamEnvironmentId{0}
+\def\kolamDotList{}
+\def\kolamOpen{open}
+\def\kolamClosed{closed}
+
+% Declaration records use a fresh namespace for every kolam environment and
+% are global only so that declarations made inside TikZ \foreach groups persist.
+% The namespace isolates successive motifs while retaining normal environment
+% scoping for all user-visible options and styles.
+\newcommand{\KolamReset}{%
+  \global\kolamDotCount=0\relax
+  \global\kolamGateCount=0\relax
+  \gdef\kolamDotList{}}
+\newenvironment{kolam}{%
+  \ifkolamActive
+    \PackageError{kolam-tikz}{Nested kolam environments are not supported}%
+      {Finish the current kolam before beginning another one.}%
+  \fi
+  \begingroup
+  \kolamActivetrue
+  \global\advance\kolamEnvironmentSerial by 1\relax
+  \edef\kolamEnvironmentId{\the\kolamEnvironmentSerial}%
+  \KolamReset
+}{\endgroup}
+
+\newcommand{\kolamRequireEnvironment}{%
+  \ifkolamActive\else
+    \kolamDeclarationValidfalse
+    \PackageError{kolam-tikz}{Kolam declarations require a kolam environment}%
+      {Wrap declarations in \string\begin{kolam} ... \string\end{kolam}.}%
+  \fi}
+
+% TikZ \foreach lists can leave spaces around the final field of a tuple.
+% Normalize every grammar terminal before using it in an identifier or an
+% arithmetic expression, so loop-generated and literal declarations agree.
+\newcommand{\kolamTrimArgument}[2]{%
+  \edef#1{#2}%
+  \edef#1{\pgfutil@trimspaces@e{#1}}}
+
+% Coordinates are grammar terminals, not arbitrary TikZ expressions.  Keeping
+% their spelling integral also gives each pulli a unique internal identifier.
+\newcommand{\kolamRequireInteger}[1]{%
+  \pgfmathtruncatemacro{\kolamIntegerValue}{#1}%
+  \edef\kolamIntegerInput{#1}%
+  \ifx\kolamIntegerInput\kolamIntegerValue\else
+    \kolamDeclarationValidfalse
+    \PackageError{kolam-tikz}{Coordinate '#1' is not an integer literal}%
+      {Pulli and gate coordinates must be decimal integers, such as -2, 0, or 3.}%
+  \fi}
+
+\newcommand{\kolamRequirePulli}[2]{%
+  \ifcsname kolam@pulli@\kolamEnvironmentId:#1:#2\endcsname\else
+    \kolamGateEndpointsValidfalse
+    \PackageError{kolam-tikz}{No pulli at (#1,#2)}%
+      {Declare it with \string\KolamPulli before using it in a gate.}%
+  \fi}
+
+\newcommand{\KolamPulli}[2]{%
+  \kolamDeclarationValidtrue
+  \kolamRequireEnvironment
+  \kolamTrimArgument\kolamXArgument{#1}%
+  \kolamTrimArgument\kolamYArgument{#2}%
+  \kolamRequireInteger{\kolamXArgument}\kolamRequireInteger{\kolamYArgument}%
+  \ifkolamDeclarationValid
+    \ifcsname kolam@pulli@\kolamEnvironmentId:\kolamXArgument:\kolamYArgument\endcsname
+      \PackageError{kolam-tikz}{Pulli (\kolamXArgument,\kolamYArgument) was declared twice}%
+        {Every coordinate may occur only once in a kolam declaration.}%
+    \else
+      \global\advance\kolamDotCount by 1\relax
+      \expandafter\xdef\csname kolam@pulli@\kolamEnvironmentId:\kolamXArgument:\kolamYArgument\endcsname{\the\kolamDotCount}%
+      \expandafter\xdef\csname kolam@x@\kolamEnvironmentId:\the\kolamDotCount\endcsname{\kolamXArgument}%
+      \expandafter\xdef\csname kolam@y@\kolamEnvironmentId:\the\kolamDotCount\endcsname{\kolamYArgument}%
+      \ifx\kolamDotList\@empty
+        \xdef\kolamDotList{\the\kolamDotCount}%
+      \else
+        \xdef\kolamDotList{\kolamDotList,\the\kolamDotCount}%
+      \fi
+    \fi
+  \fi}
+
+% A convenience declaration for the centred 3--5--5--5--3 pulli array.
+\newcommand{\KolamThreeFiveFiveFiveThree}{%
+  \KolamPulli{-1}{2}\KolamPulli{0}{2}\KolamPulli{1}{2}%
+  \KolamPulli{-2}{1}\KolamPulli{-1}{1}\KolamPulli{0}{1}\KolamPulli{1}{1}\KolamPulli{2}{1}%
+  \KolamPulli{-2}{0}\KolamPulli{-1}{0}\KolamPulli{0}{0}\KolamPulli{1}{0}\KolamPulli{2}{0}%
+  \KolamPulli{-2}{-1}\KolamPulli{-1}{-1}\KolamPulli{0}{-1}\KolamPulli{1}{-1}\KolamPulli{2}{-1}%
+  \KolamPulli{-1}{-2}\KolamPulli{0}{-2}\KolamPulli{1}{-2}}
+
+\newcommand{\KolamPort}[3]{%
+  ($ (#1,#2)+({\kolamRadius*cos(#3)},{\kolamRadius*sin(#3)}) $)}
+\newcommand{\kolamPortAngle}[1]{\csname kolam#1\endcsname}
+\newcommand{\kolamSetSide}[4]{%
+  \expandafter\xdef\csname kolam@side@\kolamEnvironmentId:#1:#2:#3\endcsname{#4}}
+\newcommand{\kolamIfSideOpen}[5]{%
+  \ifcsname kolam@side@\kolamEnvironmentId:#1:#2:#3\endcsname
+    \edef\kolamCurrentState{\csname kolam@side@\kolamEnvironmentId:#1:#2:#3\endcsname}%
+    \ifx\kolamCurrentState\kolamOpen #4\else #5\fi
+  \else #5\fi}
+
+% \KolamGate{x}{y}{u}{v}{open|closed} declares one induced cardinal edge.
+% It records the same state at both endpoint sides, so mismatched gates cannot
+% occur.  Gates that are not named are closed by convention.
+\newcommand{\KolamGate}[5]{%
+  \kolamDeclarationValidtrue
+  \kolamRequireEnvironment
+  \kolamTrimArgument\kolamXArgument{#1}%
+  \kolamTrimArgument\kolamYArgument{#2}%
+  \kolamTrimArgument\kolamUArgument{#3}%
+  \kolamTrimArgument\kolamVArgument{#4}%
+  \kolamRequireInteger{\kolamXArgument}\kolamRequireInteger{\kolamYArgument}%
+  \kolamRequireInteger{\kolamUArgument}\kolamRequireInteger{\kolamVArgument}%
+  \ifkolamDeclarationValid
+    \kolamGateEndpointsValidtrue
+    \kolamRequirePulli{\kolamXArgument}{\kolamYArgument}%
+    \kolamRequirePulli{\kolamUArgument}{\kolamVArgument}%
+    \ifkolamGateEndpointsValid
+      \pgfmathtruncatemacro{\kolamDX}{\kolamUArgument-\kolamXArgument}%
+      \pgfmathtruncatemacro{\kolamDY}{\kolamVArgument-\kolamYArgument}%
+      \def\kolamSideOne{}\def\kolamSideTwo{}%
+      \ifnum\kolamDX=1\ifnum\kolamDY=0\def\kolamSideOne{E}\def\kolamSideTwo{W}\fi\fi
+      \ifnum\kolamDX=-1\ifnum\kolamDY=0\def\kolamSideOne{W}\def\kolamSideTwo{E}\fi\fi
+      \ifnum\kolamDX=0\ifnum\kolamDY=1\def\kolamSideOne{N}\def\kolamSideTwo{S}\fi\fi
+      \ifnum\kolamDX=0\ifnum\kolamDY=-1\def\kolamSideOne{S}\def\kolamSideTwo{N}\fi\fi
+      \ifx\kolamSideOne\@empty
+        \PackageError{kolam-tikz}{Gate (\kolamXArgument,\kolamYArgument)--(\kolamUArgument,\kolamVArgument) is not a cardinal unit edge}%
+          {Gates may connect only horizontally or vertically adjacent pulli.}%
+      \else
+        \ifcsname kolam@gate@\kolamEnvironmentId:\kolamXArgument:\kolamYArgument:\kolamUArgument:\kolamVArgument\endcsname
+          \PackageError{kolam-tikz}{Gate (\kolamXArgument,\kolamYArgument)--(\kolamUArgument,\kolamVArgument) was declared twice}%
+            {Name each undirected gate only once.}%
+        \else\ifcsname kolam@gate@\kolamEnvironmentId:\kolamUArgument:\kolamVArgument:\kolamXArgument:\kolamYArgument\endcsname
+          \PackageError{kolam-tikz}{Gate (\kolamXArgument,\kolamYArgument)--(\kolamUArgument,\kolamVArgument) was declared twice}%
+            {Name each undirected gate only once.}%
+        \else
+          \kolamGateStateValidtrue
+          \kolamTrimArgument\kolamStateArgument{#5}%
+          \ifx\kolamStateArgument\kolamOpen\else
+            \ifx\kolamStateArgument\kolamClosed\else
+              \kolamGateStateValidfalse
+              \PackageError{kolam-tikz}{Unknown gate state '#5'}%
+                {Use `open' or `closed'.}%
+            \fi
+          \fi
+          \ifkolamGateStateValid
+            \kolamSetSide{\kolamXArgument}{\kolamYArgument}{\kolamSideOne}{\kolamStateArgument}%
+            \kolamSetSide{\kolamUArgument}{\kolamVArgument}{\kolamSideTwo}{\kolamStateArgument}%
+            \expandafter\xdef\csname kolam@gate@\kolamEnvironmentId:\kolamXArgument:\kolamYArgument:\kolamUArgument:\kolamVArgument\endcsname{\kolamStateArgument}%
+            \expandafter\xdef\csname kolam@gate@\kolamEnvironmentId:\kolamUArgument:\kolamVArgument:\kolamXArgument:\kolamYArgument\endcsname{\kolamStateArgument}%
+            \global\advance\kolamGateCount by 1\relax
+            \expandafter\xdef\csname kolam@gatex@\kolamEnvironmentId:\the\kolamGateCount\endcsname{\kolamXArgument}%
+            \expandafter\xdef\csname kolam@gatey@\kolamEnvironmentId:\the\kolamGateCount\endcsname{\kolamYArgument}%
+            \expandafter\xdef\csname kolam@gateu@\kolamEnvironmentId:\the\kolamGateCount\endcsname{\kolamUArgument}%
+            \expandafter\xdef\csname kolam@gatev@\kolamEnvironmentId:\the\kolamGateCount\endcsname{\kolamVArgument}%
+            \expandafter\xdef\csname kolam@gatestate@\kolamEnvironmentId:\the\kolamGateCount\endcsname{\kolamStateArgument}%
+          \fi
+        \fi\fi
+      \fi
+    \fi
+  \fi}
+\newcommand{\KolamOpenGate}[4]{\KolamGate{#1}{#2}{#3}{#4}{open}}
+\newcommand{\KolamClosedGate}[4]{\KolamGate{#1}{#2}{#3}{#4}{closed}}
+
+% --------------------------------------------------------------------------
+% Renderer: permanent corner arcs, then the open-gate tracks, then pulli.
+% --------------------------------------------------------------------------
+\newcommand{\kolamCornerArcs}[2]{%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamNne}
+    arc[start angle=\kolamNne,end angle=\kolamEne,radius=\kolamRadius cm];%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamEse}
+    arc[start angle=\kolamEse,end angle=\kolamSse,radius=\kolamRadius cm];%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamSsw}
+    arc[start angle=\kolamSsw,end angle=\kolamWsw,radius=\kolamRadius cm];%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamWnw}
+    arc[start angle=\kolamWnw,end angle=\kolamNnw,radius=\kolamRadius cm];}
+\newcommand{\kolamCloseNorth}[2]{\draw[kolam strand] \KolamPort{#1}{#2}{\kolamNne}
+  arc[start angle=\kolamNne,end angle=\kolamNnw,radius=\kolamRadius cm];}
+\newcommand{\kolamCloseEast}[2]{\draw[kolam strand] \KolamPort{#1}{#2}{\kolamEse}
+  arc[start angle=\kolamEse,end angle=\kolamEne,radius=\kolamRadius cm];}
+\newcommand{\kolamCloseSouth}[2]{\draw[kolam strand] \KolamPort{#1}{#2}{\kolamSse}
+  arc[start angle=\kolamSse,end angle=\kolamSsw,radius=\kolamRadius cm];}
+\newcommand{\kolamCloseWest}[2]{\draw[kolam strand] \KolamPort{#1}{#2}{\kolamWnw}
+  arc[start angle=\kolamWnw,end angle=\kolamWswCCW,radius=\kolamRadius cm];}
+\newcommand{\kolamDrawLocal}[2]{%
+  \kolamCornerArcs{#1}{#2}%
+  \kolamIfSideOpen{#1}{#2}{N}{}{\kolamCloseNorth{#1}{#2}}%
+  \kolamIfSideOpen{#1}{#2}{E}{}{\kolamCloseEast{#1}{#2}}%
+  \kolamIfSideOpen{#1}{#2}{S}{}{\kolamCloseSouth{#1}{#2}}%
+  \kolamIfSideOpen{#1}{#2}{W}{}{\kolamCloseWest{#1}{#2}}}
+\newcommand{\kolamDrawOpenHorizontal}[4]{%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamEne} -- \KolamPort{#3}{#4}{\kolamWsw};%
+  \draw[kolam strand] \KolamPort{#1}{#2}{\kolamEse} -- \KolamPort{#3}{#4}{\kolamWnw};}
+\newcommand{\kolamDrawOpenVertical}[4]{%
+  \draw[kolam strand] \KolamPort{#3}{#4}{\kolamSse} -- \KolamPort{#1}{#2}{\kolamNnw};%
+  \draw[kolam strand] \KolamPort{#3}{#4}{\kolamSsw} -- \KolamPort{#1}{#2}{\kolamNne};}
+\newcommand{\kolamDrawGate}[5]{%
+  \edef\kolamStateArgument{#5}%
+  \ifx\kolamStateArgument\kolamOpen
+    \pgfmathtruncatemacro{\kolamDX}{#3-#1}%
+    \pgfmathtruncatemacro{\kolamDY}{#4-#2}%
+    \ifnum\kolamDX=1\kolamDrawOpenHorizontal{#1}{#2}{#3}{#4}\fi
+    \ifnum\kolamDX=-1\kolamDrawOpenHorizontal{#3}{#4}{#1}{#2}\fi
+    \ifnum\kolamDY=1\kolamDrawOpenVertical{#1}{#2}{#3}{#4}\fi
+    \ifnum\kolamDY=-1\kolamDrawOpenVertical{#3}{#4}{#1}{#2}\fi
+  \fi}
+\newcommand{\kolamDrawDotIndex}[1]{%
+  \edef\kolamX{\csname kolam@x@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamY{\csname kolam@y@\kolamEnvironmentId:#1\endcsname}%
+  \node[kolam dot] at (\kolamX,\kolamY) {};}
+\newcommand{\kolamDrawLocalIndex}[1]{%
+  \edef\kolamX{\csname kolam@x@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamY{\csname kolam@y@\kolamEnvironmentId:#1\endcsname}%
+  \kolamDrawLocal{\kolamX}{\kolamY}}
+\newcommand{\kolamDrawGateIndex}[1]{%
+  \edef\kolamX{\csname kolam@gatex@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamY{\csname kolam@gatey@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamU{\csname kolam@gateu@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamV{\csname kolam@gatev@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamState{\csname kolam@gatestate@\kolamEnvironmentId:#1\endcsname}%
+  \kolamDrawGate{\kolamX}{\kolamY}{\kolamU}{\kolamV}{\kolamState}}
+\newcommand{\KolamRender}{%
+  \ifkolamActive
+    \ifnum\kolamDotCount>0
+      \foreach \kolamIndex in \kolamDotList {\kolamDrawLocalIndex{\kolamIndex}}%
+      \ifnum\kolamGateCount>0
+        \foreach \kolamIndex in {1,...,\the\kolamGateCount}{\kolamDrawGateIndex{\kolamIndex}}%
+      \fi
+      \foreach \kolamIndex in \kolamDotList {\kolamDrawDotIndex{\kolamIndex}}%
+    \else
+      \PackageError{kolam-tikz}{Cannot render an empty kolam}%
+        {Declare at least one pulli before calling \string\KolamRender.}%
+    \fi
+  \else
+    \PackageError{kolam-tikz}{Kolam rendering requires a kolam environment}%
+      {Wrap declarations and \string\KolamRender in \string\begin{kolam} ... \string\end{kolam}.}%
+  \fi
+  }
+
+% Optional assertion for the Drop--Fan sublanguage: every pulli
+% must have one or three open incident gates.  Decorative examples may use
+% other degrees and should simply omit this assertion.
+\newcommand{\kolamAddIfOpen}[3]{\kolamIfSideOpen{#1}{#2}{#3}{\advance\kolamOpenDegree by 1\relax}{}}
+\newcommand{\kolamAssertDropFanIndex}[1]{%
+  \edef\kolamX{\csname kolam@x@\kolamEnvironmentId:#1\endcsname}%
+  \edef\kolamY{\csname kolam@y@\kolamEnvironmentId:#1\endcsname}%
+  \kolamOpenDegree=0\relax
+  \kolamAddIfOpen{\kolamX}{\kolamY}{N}\kolamAddIfOpen{\kolamX}{\kolamY}{E}%
+  \kolamAddIfOpen{\kolamX}{\kolamY}{S}\kolamAddIfOpen{\kolamX}{\kolamY}{W}%
+  \ifcase\kolamOpenDegree
+    \PackageError{kolam-tikz}{Pulli (\kolamX,\kolamY) has no open gate}%
+      {Drop--Fan pulli need one or three open incident gates.}%
+  \or
+  \or
+    \PackageError{kolam-tikz}{Pulli (\kolamX,\kolamY) has two open gates}%
+      {Drop--Fan pulli need one or three open incident gates.}%
+  \or
+  \else
+    \PackageError{kolam-tikz}{Pulli (\kolamX,\kolamY) has four open gates}%
+      {Drop--Fan pulli need one or three open incident gates.}%
+  \fi}
+\newcommand{\KolamAssertDropFan}{%
+  \ifkolamActive
+    \ifnum\kolamDotCount>0
+      \foreach \kolamIndex in \kolamDotList {\kolamAssertDropFanIndex{\kolamIndex}}%
+    \else
+      \PackageError{kolam-tikz}{Cannot validate an empty kolam}%
+        {Declare at least one pulli before calling \string\KolamAssertDropFan.}%
+    \fi
+  \else
+    \PackageError{kolam-tikz}{Kolam validation requires a kolam environment}%
+      {Wrap declarations and validation in \string\begin{kolam} ... \string\end{kolam}.}%
+  \fi}
+
+\endinput

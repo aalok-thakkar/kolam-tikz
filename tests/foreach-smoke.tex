@@ -1,0 +1,47 @@
+\documentclass[tikz,border=3pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+\begin{tikzpicture}[kolam grid,scale=.45]
+  \begin{kolam}
+    % Declarations inside TikZ loops must survive each loop iteration.
+    \foreach \x/\y in {
+      0/0,
+      1/0,
+      0/1,
+      1/1
+    } {
+      \KolamPulli{\x}{\y}
+    }
+    % Gate declarations inside loops must persist as well. This exercises the
+    % generic command, a reversed edge, an explicit closure, and macro states.
+    \foreach \x/\y/\u/\v/\state in {
+      1/0/0/0/open,
+      0/1/1/1/closed,
+      0/0/0/1/open,
+      1/0/1/1/open
+    } {
+      \KolamGate{\x}{\y}{\u}{\v}{\state}
+    }
+    \KolamRender
+  \end{kolam}
+  \begin{scope}[shift={(2.3,0)}]
+    % A second declaration set exercises namespace isolation and whitespace
+    % on the final coordinate of a four-field \foreach tuple.
+    \begin{kolam}
+      \foreach \x/\y in {
+        0/0,
+        1/0
+      } {
+        \KolamPulli{\x}{\y}
+      }
+      \foreach \x/\y/\u/\v in {
+        0/0/1/0
+      } {
+        \KolamOpenGate{\x}{\y}{\u}{\v}
+      }
+      \KolamRender
+    \end{kolam}
+  \end{scope}
+\end{tikzpicture}
+\end{document}

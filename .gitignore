@@ -1,0 +1,17 @@
+# TeX / latexmk build products (the example PDFs are intentional assets).
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
+
+# Python and operating-system noise.
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Rendered preview scratch files.  docs/assets/gallery.png is intentional.
+docs/assets/gallery-*.png
+
+# Smoke-test output; only the example PDFs are committed.
+tests/*.pdf

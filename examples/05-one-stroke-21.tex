@@ -1,0 +1,29 @@
+% A 21-pulli one-stroke kolam.
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+\begin{tikzpicture}[kolam grid]
+  \path[use as bounding box] (-2.65,-2.65) rectangle (2.65,2.65);
+  \begin{kolam}
+    \KolamSetup{turn radius=exact,line width=1.12pt,dot size=4.05pt}
+    \KolamThreeFiveFiveFiveThree
+
+    % Each declaration is a graph edge between cardinally adjacent pulli.
+    % Omitted induced-grid edges are closed.  The two explicit closed gates
+    % make the central spine (0,1)--(0,0)--(0,-1) one smooth closed stroke.
+    \KolamOpenGate{-2}{1}{-1}{1}\KolamOpenGate{-1}{1}{0}{1}
+    \KolamOpenGate{0}{1}{1}{1}\KolamOpenGate{1}{1}{2}{1}
+    \KolamOpenGate{-2}{-1}{-1}{-1}\KolamClosedGate{-1}{-1}{0}{-1}
+    \KolamClosedGate{0}{-1}{1}{-1}\KolamOpenGate{1}{-1}{2}{-1}
+    \KolamOpenGate{-2}{0}{-1}{0}\KolamOpenGate{1}{0}{2}{0}
+    \KolamOpenGate{-1}{-2}{-1}{-1}\KolamOpenGate{-1}{-1}{-1}{0}
+    \KolamOpenGate{-1}{0}{-1}{1}\KolamOpenGate{-1}{1}{-1}{2}
+    \KolamOpenGate{1}{-2}{1}{-1}\KolamOpenGate{1}{-1}{1}{0}
+    \KolamOpenGate{1}{0}{1}{1}\KolamOpenGate{1}{1}{1}{2}
+    \KolamOpenGate{0}{-2}{0}{-1}\KolamOpenGate{0}{1}{0}{2}
+    \KolamOpenGate{0}{1}{0}{0}\KolamOpenGate{0}{0}{0}{-1}
+    \KolamRender
+  \end{kolam}
+\end{tikzpicture}
+\end{document}

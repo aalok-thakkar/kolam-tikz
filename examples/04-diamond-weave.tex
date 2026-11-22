@@ -1,0 +1,28 @@
+% A 21-pulli decorative diamond weave on a 3-5-5-5-3 field.
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+\begin{tikzpicture}[kolam grid]
+  \path[use as bounding box] (-2.65,-2.65) rectangle (2.65,2.65);
+  \begin{kolam}
+    \KolamSetup{turn radius=exact,line width=1.12pt,dot size=4.05pt}
+    \KolamThreeFiveFiveFiveThree
+
+    % Horizontal diamond bands.
+    \KolamOpenGate{-2}{1}{-1}{1}\KolamOpenGate{-1}{1}{0}{1}
+    \KolamOpenGate{0}{1}{1}{1}\KolamOpenGate{1}{1}{2}{1}
+    \KolamOpenGate{-2}{-1}{-1}{-1}\KolamOpenGate{-1}{-1}{0}{-1}
+    \KolamOpenGate{0}{-1}{1}{-1}\KolamOpenGate{1}{-1}{2}{-1}
+    \KolamOpenGate{-2}{0}{-1}{0}\KolamOpenGate{1}{0}{2}{0}
+
+    % The two symmetric woven sides and the central vertical rhythm.
+    \KolamOpenGate{-1}{-2}{-1}{-1}\KolamOpenGate{-1}{-1}{-1}{0}
+    \KolamOpenGate{-1}{0}{-1}{1}\KolamOpenGate{-1}{1}{-1}{2}
+    \KolamOpenGate{1}{-2}{1}{-1}\KolamOpenGate{1}{-1}{1}{0}
+    \KolamOpenGate{1}{0}{1}{1}\KolamOpenGate{1}{1}{1}{2}
+    \KolamOpenGate{0}{-2}{0}{-1}\KolamOpenGate{0}{1}{0}{2}
+    \KolamRender
+  \end{kolam}
+\end{tikzpicture}
+\end{document}

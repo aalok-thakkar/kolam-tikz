@@ -1,0 +1,20 @@
+% Smallest coordinate-first example.  Compile from this directory with
+% `latexmk -pdf 01-minimal-loop.tex`.
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{kolam-tikz}
+
+\begin{document}
+\begin{tikzpicture}[kolam grid]
+  \path[use as bounding box] (-.62,-.62) rectangle (1.62,1.62);
+  \begin{kolam}
+    \KolamSetup{turn radius=exact,line width=1.2pt,dot size=4.2pt}
+    \KolamPulli{0}{0}\KolamPulli{1}{0}
+    \KolamPulli{0}{1}\KolamPulli{1}{1}
+    \KolamOpenGate{0}{0}{1}{0}
+    \KolamOpenGate{0}{1}{1}{1}
+    \KolamOpenGate{0}{0}{0}{1}
+    \KolamOpenGate{1}{0}{1}{1}
+    \KolamRender
+  \end{kolam}
+\end{tikzpicture}
+\end{document}
